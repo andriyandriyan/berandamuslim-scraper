@@ -251,6 +251,14 @@ app.get('/insert-videos', async (request, reply) => {
     await Promise.all(promises);
     return { message: 'success' };
   }, { timeout: 12 * 60 * 1000 });
+  await prisma.videoId.updateMany({
+    where: {
+      id: {
+        in: videoIds.map(videoId => videoId.id),
+      },
+    },
+    data: { done: true },
+  })
   reply.send(data);
 });
 
