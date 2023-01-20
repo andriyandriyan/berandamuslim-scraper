@@ -259,6 +259,7 @@ const start = async () => {
   try {
     const port = Number(process.env.PORT || 3030);
     await app.listen({ port })
+    console.log(`started server on 0.0.0.0:${port}`)
   } catch (err) {
     app.log.error(err)
     process.exit(1)
