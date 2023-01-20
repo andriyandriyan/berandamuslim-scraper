@@ -257,7 +257,8 @@ app.get('/insert-videos', async (request, reply) => {
 // Start the server
 const start = async () => {
   try {
-    await app.listen({ port: 3030 })
+    const port = Number(process.env.PORT || 3030);
+    await app.listen({ port })
   } catch (err) {
     app.log.error(err)
     process.exit(1)
