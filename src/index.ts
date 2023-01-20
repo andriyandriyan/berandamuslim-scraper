@@ -207,6 +207,7 @@ app.get('/scrape-videos', async (request, reply) => {
 
 app.get('/insert-videos', async (request, reply) => {
   const { prisma } = app;
+  const liveOrUpcomingIds: string[] = [];
   const videoIds = await prisma.videoId.findMany({ where: { done: false } });
   const perPage = 40;
   const totalPage = Math.ceil(videoIds.length / perPage);
@@ -225,8 +226,12 @@ app.get('/insert-videos', async (request, reply) => {
           id: videoIds.slice(start, end).map(videoId => videoId.id),
         });
         const videos = items.filter(item => {
-          const { snippet } = item;
-          return !['upcoming', 'live'].includes(snippet!.liveBroadcastContent!);
+          const { id, snippet } = item;
+          const isLiveOrUpcoming = ['upcoming', 'live'].includes(snippet!.liveBroadcastContent!);
+          if (isLiveOrUpcoming) {
+            liveOrUpcomingIds.push(id!);
+          }
+          return !isLiveOrUpcoming;
         });
         const inserts: Promise<any>[] = videos.map(video => {
           const { id, snippet, contentDetails } = video;
@@ -260,7 +265,14 @@ app.get('/insert-videos', async (request, reply) => {
       },
     },
     data: { done: true },
-  })
+  });
+  await prisma.videoId.deleteMany({
+    where: {
+      id: {
+        in: liveOrUpcomingIds,
+      },
+    },
+  });
   reply.send(data);
 });
 
