@@ -15,7 +15,9 @@ const app = fastify({
   logger: process.env.NODE_ENV === 'development',
 });
 
-app.register(prismaPlugin)
+app.register(prismaPlugin);
+
+app.get('/', () => ({ hello: 'world' }));
 
 app.get('/articles', async (request, reply) => {
   const { prisma } = app;
