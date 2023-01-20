@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Source {
+  id                  Int       @id @default(autoincrement())
+  name                String    @db.VarChar(30)
+  image               String?   @db.VarChar(200)
+  url                 String    @db.VarChar(30)
+  articleSourcesCount Int
+  articles            Article[]
+  deletedAt           DateTime?
+
+  @@map("sources")
+}
+
+model ArticleCategory {
+  id      Int       @id @default(autoincrement())
+  name    String    @db.VarChar(70)
+  slug    String    @db.VarChar(50)
+  Article Article[]
+
+  @@map("article_categories")
+}
+
+model Article {
+  id                String           @id @db.VarChar(12)
+  title             String           @db.VarChar(180)
+  image             String?
+  originArticleId   Int
+  sourceUrl         String
+  sourceId          Int
+  source            Source           @relation(fields: [sourceId], references: [id])
+  articleCategoryId Int?
+  articleCategory   ArticleCategory? @relation(fields: [articleCategoryId], references: [id])
+  tags              String[]
+  date              DateTime
+  modified          DateTime
+  createdAt         DateTime         @default(now())
+  deletedAt         DateTime?
+
+  @@map("articles")
+}
+
+model Channel {
+  id        String    @id @db.VarChar(24)
+  name      String    @db.VarChar(80)
+  customUrl String    @db.VarChar(40)
+  image     String    @db.VarChar(150)
+  videos    Video[]
+  deletedAt DateTime?
+
+  @@map("channels")
+}
+
+model Video {
+  id                   String    @id @db.VarChar(11)
+  title                String    @db.VarChar(150)
+  description          String
+  thumbnail            String    @db.VarChar(80)
+  duration             String    @db.VarChar(16)
+  channelId            String    @db.VarChar(24)
+  channel              Channel   @relation(fields: [channelId], references: [id])
+  liveBroadcastContent String    @db.VarChar(10)
+  publishedAt          DateTime
+  createdAt            DateTime  @default(now())
+  deletedAt            DateTime?
+
+  @@map("videos")
+}
+
+model VideoId {
+  id   String  @id @db.VarChar(11)
+  done Boolean @default(false)
+
+  @@map("video_ids")
+}
