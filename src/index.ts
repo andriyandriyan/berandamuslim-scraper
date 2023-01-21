@@ -162,7 +162,10 @@ app.get('/articles', async (request, reply) => {
 
 app.get('/scrape-videos', async (request, reply) => {
   const { prisma } = app;
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({
+    executablePath: process.env.CHROMIUM_PATH,
+    args: ['--no-sandbox'],
+  });
   const channels = await prisma.channel.findMany({
     where: { deletedAt: null },
   });
