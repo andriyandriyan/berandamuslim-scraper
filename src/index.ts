@@ -1,6 +1,7 @@
 import { youtube } from '@googleapis/youtube';
 import { Prisma, Source } from '@prisma/client';
 import axios, { AxiosRequestConfig } from 'axios';
+import chromium from 'chromium';
 import * as dotenv from 'dotenv'
 import fastify from 'fastify';
 import { DateTime } from 'luxon';
