@@ -67,3 +67,50 @@ export interface Schedule {
   isya: string;
   date: string;
 }
+
+export interface YoutubeInitialData {
+  contents: YoutubeInitialDataContent;
+}
+
+export interface YoutubeInitialDataContent {
+  twoColumnBrowseResultsRenderer: TwoColumnBrowseResultsRenderer;
+}
+
+export interface TwoColumnBrowseResultsRenderer {
+  tabs: Tab[];
+}
+
+export interface Tab {
+  tabRenderer?: TabRenderer;
+}
+
+export interface TabRenderer {
+  title: string;
+  trackingParams: string;
+  selected?: boolean;
+  content?: TabRendererContent;
+}
+
+export interface TabRendererContent {
+  richGridRenderer?: RichGridRenderer;
+}
+
+export interface RichGridRenderer {
+  contents: RichGridRendererContent[];
+}
+
+export interface RichGridRendererContent {
+  richItemRenderer?: RichItemRenderer;
+}
+
+export interface RichItemRenderer {
+  content: RichItemRendererContent;
+}
+
+export interface RichItemRendererContent {
+  videoRenderer: VideoRenderer;
+}
+
+export interface VideoRenderer {
+  videoId: string;
+}

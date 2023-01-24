@@ -1,13 +1,11 @@
 import { youtube } from '@googleapis/youtube';
 import { Prisma, Source } from '@prisma/client';
 import axios, { AxiosRequestConfig } from 'axios';
-import chromium from 'chromium';
 import * as dotenv from 'dotenv'
 import fastify from 'fastify';
 import { DateTime } from 'luxon';
-import { nanoid } from 'nanoid'
-import puppeteer from 'puppeteer';
-import { Post, WpTerm } from './interfaces';
+import { nanoid } from 'nanoid';
+import { Post, WpTerm, YoutubeInitialData } from './interfaces';
 import prismaPlugin from './plugins/prisma';
 
 dotenv.config();
@@ -161,58 +159,38 @@ app.get('/articles', async (request, reply) => {
   reply.send(data);
 });
 
-app.get('/scrape-videos', async (request, reply) => {
+app.get('/videos', async (request, reply) => {
   const { prisma } = app;
-  const browser = await puppeteer.launch({
-    executablePath: chromium.path,
-    args: ['--no-sandbox'],
-  });
   const channels = await prisma.channel.findMany({
     where: { deletedAt: null },
   });
-  const data: string[] = [];
-  for (const channel of channels) {
-    const promises: Promise<string[]>[] = [];
+  const videoIds: string[] = [];
+  const scrapes: Promise<void>[] = [];
+  channels.forEach(channel => {
     ['videos', 'streams'].forEach(tab => {
-      promises.push(new Promise<string[]>(async resolve => {
-        const page = await browser.newPage();
-        await page.setViewport({
-          width: 1200,
-          height: 720,
-        });
-        page.setDefaultNavigationTimeout(0);
-        await page.goto(`https://www.youtube.com/@${channel.customUrl}/${tab}`);
-        await page.waitForSelector('.ytd-channel-name');
-        const videoIds = await page.$$eval('#contents #content a#video-title-link', (anchors: HTMLAnchorElement[]) => {
-          return anchors.map(anchor => {
-            const [, videoId] = anchor.href.split('=');
-            return videoId;
-          })
-        });
-        await page.close();
-        resolve(videoIds);
+      scrapes.push(new Promise<void>(async resolve => {
+        const url = `https://www.youtube.com/@${channel.customUrl}/${tab}`;
+        const response = await axios.get<string>(url);
+        const initialDataString = response.data.match('>var ytInitialData = (.*);</script>');
+        const initialData: YoutubeInitialData = JSON.parse(initialDataString![1]);
+        const tabRenderer: { [key: string]: number } = {
+          videos: 1,
+          streams: 3,
+        };
+        const index = tabRenderer[tab];
+        initialData.contents.twoColumnBrowseResultsRenderer.tabs[index].tabRenderer?.content?.richGridRenderer?.contents
+          .slice(0, 12)
+          .forEach(content => {
+            const { videoId } = content.richItemRenderer?.content.videoRenderer || {};
+            if (videoId) {
+              videoIds.push(videoId);
+            }
+          });
+        resolve();
       }));
     });
-    const ids = await Promise.all(promises);
-    ids.flatMap(id => id).forEach(id => data.push(id));
-  }
-  await browser.close();
-  const promises: Promise<void>[] = data.map(id => new Promise<void>(async resolve => {
-    await prisma.videoId.upsert({
-      where: { id },
-      create: { id },
-      update: {},
-    });
-    resolve();
-  }));
-  await Promise.all(promises);
-  reply.send({ message: 'success' });
-});
-
-app.get('/insert-videos', async (request, reply) => {
-  const { prisma } = app;
-  const liveOrUpcomingIds: string[] = [];
-  const videoIds = await prisma.videoId.findMany({ where: { done: false } });
+  });
+  await Promise.all(scrapes);
   const perPage = 40;
   const totalPage = Math.ceil(videoIds.length / perPage);
   const data = await prisma.$transaction(async trx => {
@@ -227,14 +205,11 @@ app.get('/insert-videos', async (request, reply) => {
         }).videos.list({
           part: ['id', 'snippet', 'contentDetails'],
           maxResults: 40,
-          id: videoIds.slice(start, end).map(videoId => videoId.id),
+          id: videoIds.slice(start, end).map(videoId => videoId),
         });
         const videos = items.filter(item => {
-          const { id, snippet } = item;
+          const { snippet } = item;
           const isLiveOrUpcoming = ['upcoming', 'live'].includes(snippet!.liveBroadcastContent!);
-          if (isLiveOrUpcoming) {
-            liveOrUpcomingIds.push(id!);
-          }
           return !isLiveOrUpcoming;
         });
         const inserts: Promise<any>[] = videos.map(video => {
@@ -262,21 +237,6 @@ app.get('/insert-videos', async (request, reply) => {
     await Promise.all(promises);
     return { message: 'success' };
   }, { timeout: 12 * 60 * 1000 });
-  await prisma.videoId.updateMany({
-    where: {
-      id: {
-        in: videoIds.map(videoId => videoId.id),
-      },
-    },
-    data: { done: true },
-  });
-  await prisma.videoId.deleteMany({
-    where: {
-      id: {
-        in: liveOrUpcomingIds,
-      },
-    },
-  });
   reply.send(data);
 });
 
