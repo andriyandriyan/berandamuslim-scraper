@@ -27,7 +27,13 @@ app.get('/articles', async (request, reply) => {
     },
     include: {
       _count: {
-        select: { articles: true },
+        select: {
+          articles: {
+            where: {
+              deletedAt: null,
+            },
+          },
+        },
       },
     },
   });
