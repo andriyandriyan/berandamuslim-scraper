@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["filteredRelationCount"]
 }
 
@@ -80,4 +80,84 @@ model VideoId {
   done Boolean @default(false)
 
   @@map("video_ids")
+}
+
+model City {
+  id                String                 @id @db.VarChar(4)
+  name              String                 @db.VarChar(40)
+  kajianLocations   KajianLocation[]
+  kajianInfo        KajianInfo[]
+  instagramAccounts CityInstagramAccount[]
+
+  @@map("cities")
+}
+
+enum InstagramAccountType {
+  INFO_KAJIAN   @map("info_kajian")
+  POSTER_DAKWAH @map("poster_dakwah")
+}
+
+model InstagramAccount {
+  id         String                 @id @db.VarChar(4)
+  name       String                 @db.VarChar(80)
+  username   String                 @db.VarChar(40)
+  type       InstagramAccountType
+  kajianInfo KajianInfo[]
+  cities     CityInstagramAccount[]
+  deletedAt  DateTime?
+
+  @@map("instagram_accounts")
+}
+
+model CityInstagramAccount {
+  cityId             String           @db.VarChar(4)
+  city               City             @relation(fields: [cityId], references: [id])
+  instagramAccountId String           @db.VarChar(11)
+  instagramAccount   InstagramAccount @relation(fields: [instagramAccountId], references: [id])
+
+  @@id([cityId, instagramAccountId])
+  @@map("city_instagram_account")
+}
+
+model KajianLocation {
+  id                String              @id @db.VarChar(11)
+  name              String              @db.VarChar(80)
+  address           String              @db.Text
+  lat               Decimal             @db.Decimal(10, 8)
+  lng               Decimal             @db.Decimal(11, 8)
+  cityId            String              @db.VarChar(4)
+  city              City                @relation(fields: [cityId], references: [id])
+  kajianInfo        KajianInfo[]
+  createdAt         DateTime            @default(now())
+  deletedAt         DateTime?
+  kajianLocationMap KajianLocationMap[]
+
+  @@map("kajian_locations")
+}
+
+model KajianInfo {
+  id                 String           @id @db.VarChar(13)
+  image              String
+  instagramAccountId String           @db.VarChar(11)
+  instagramAccount   InstagramAccount @relation(fields: [instagramAccountId], references: [id])
+  kajianLocationId   String?          @db.VarChar(4)
+  kajianLocation     KajianLocation?  @relation(fields: [kajianLocationId], references: [id])
+  cityId             String?          @db.VarChar(4)
+  city               City?            @relation(fields: [cityId], references: [id])
+  lat                Decimal?         @db.Decimal(10, 8)
+  lng                Decimal?         @db.Decimal(11, 8)
+  performedAt        DateTime?
+  createdAt          DateTime         @default(now())
+  deletedAt          DateTime?
+
+  @@map("kajian_info")
+}
+
+model KajianLocationMap {
+  id               Int            @id @default(autoincrement())
+  mapId            String         @db.VarChar(30)
+  kajianLocationId String         @db.VarChar(4)
+  kajianLocation   KajianLocation @relation(fields: [kajianLocationId], references: [id])
+
+  @@map("kajian_location_maps")
 }
