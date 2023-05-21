@@ -114,3 +114,33 @@ export interface RichItemRendererContent {
 export interface VideoRenderer {
   videoId: string;
 }
+
+export interface InstagramPostData {
+  next_max_id: string;
+  status: string;
+  more_available: boolean;
+  items: InstagramPostItem[];
+}
+
+export interface InstagramPostItem {
+  image_versions2?: InstagramImageVersion;
+  caption?: InstagramPostCaption;
+  carousel_media?: {
+    image_versions2: InstagramImageVersion;
+  }[];
+  code: string;
+}
+
+export interface InstagramImageVersion {
+  candidates: InstagramImageVersionCandidate[];
+}
+
+export interface InstagramImageVersionCandidate {
+  width: number;
+  height: number;
+  url:string;
+}
+
+export interface InstagramPostCaption {
+  text: string;
+}

@@ -1,11 +1,12 @@
 import { youtube } from '@googleapis/youtube';
-import { Prisma, Source } from '@prisma/client';
+import { KajianLocationMap, Prisma, Source } from '@prisma/client';
 import axios, { AxiosRequestConfig } from 'axios';
-import * as dotenv from 'dotenv'
+import * as dotenv from 'dotenv';
 import fastify from 'fastify';
 import { DateTime } from 'luxon';
 import { nanoid } from 'nanoid';
-import { Post, WpTerm, YoutubeInitialData } from './interfaces';
+import TelegramBot from 'node-telegram-bot-api';
+import { InstagramPostData, Post, WpTerm, YoutubeInitialData } from './interfaces';
 import prismaPlugin from './plugins/prisma';
 
 dotenv.config();
@@ -237,6 +238,103 @@ app.get('/videos', async (request, reply) => {
           });
         });
         await Promise.all(inserts);
+        resolve();
+      }));
+    });
+    await Promise.all(promises);
+    return { message: 'success' };
+  }, { timeout: 12 * 60 * 1000 });
+  reply.send(data);
+});
+
+app.get('/kajian-info', async (request, reply) => {
+  const { prisma } = app;
+  const instagramAccounts = await prisma.instagramAccount.findMany({
+    where: {
+      deletedAt: null,
+    },
+    include: {
+      cities: true,
+    },
+  });
+  const data = await prisma.$transaction(async trx => {
+    const promises: Promise<void>[] = [];
+    instagramAccounts.forEach(({ id: instagramAccountId, username, cities }) => {
+      promises.push(new Promise(async resolve => {
+        const url = `https://www.instagram.com/api/v1/feed/user/${username}/username`;
+        const { data: { items } } = await axios.get<InstagramPostData>(url, {
+          params: { count: 60 },
+          headers: {
+            'x-ig-app-id': process.env.IG_APP_ID,
+          },
+        });
+        const [{ cityId }] = cities;
+        await Promise.all(items.map(item => {
+          return new Promise<void>(async res => {
+            const regex = /(http[s]?:\/\/[^\s]+)/gi;
+            const [mapUrl] = item.caption?.text.match(regex) || [];
+            const mapId = mapUrl?.split('/').pop()
+            let kajianLocationMap: (KajianLocationMap & {
+              kajianLocation: {
+                id: string;
+                lat: Prisma.Decimal;
+                lng: Prisma.Decimal;
+                cityId: string;
+              };
+            }) | null = null;
+            if (mapId) {
+              kajianLocationMap = await prisma.kajianLocationMap.findFirst({
+                where: {
+                  mapId,
+                },
+                include: {
+                  kajianLocation: {
+                    select: {
+                      id: true,
+                      cityId: true,
+                      lat: true,
+                      lng: true,
+                    },
+                  },
+                },
+              });
+              const isProduction = process.env.NODE_ENV === 'production';
+              if (!kajianLocationMap && isProduction) {
+                const token = process.env.TELEGRAM_ERROR_BOT_TOKEN!;
+                const chatId = process.env.TELEGRAM_CHAT_ID!;
+                const bot = new TelegramBot(token);
+                const message = `MapId untuk ${mapUrl} pada post https://instagram.com/p/${item.code} tidak ditemukan`;
+                await bot.sendMessage(chatId, message);
+              }
+            }
+            const images: string[] = []
+            if (item.image_versions2) {
+              const [{ url }] = item.image_versions2.candidates.sort((a, b) => b.width - a.width);
+              images.push(url);
+            } else if (item.carousel_media) {
+              item.carousel_media.forEach(media => {
+                const [{ url }] = media.image_versions2.candidates.sort((a, b) => b.width - a.width); images.push(url);
+              })
+            }
+            for (const [i, image] of images.entries()) {
+                const id = `${item.code}${images.length > 1 ? `-${i + 1}` : ''}`;
+                await trx.kajianInfo.upsert({
+                where: { id },
+                create: {
+                  id,
+                  image,
+                  instagramAccountId,
+                  kajianLocationId: kajianLocationMap?.kajianLocationId,
+                  cityId: kajianLocationMap?.kajianLocation.cityId || cityId,
+                  lat: kajianLocationMap?.kajianLocation.lat,
+                  lng: kajianLocationMap?.kajianLocation.lng,
+                },
+                update: {},
+              });
+            }
+            res();
+          });
+        }));
         resolve();
       }));
     });
