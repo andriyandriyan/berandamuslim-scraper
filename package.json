@@ -5,8 +5,16 @@
   "scripts": {
     "prebuild": "rimraf dist",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "ts.check": "tsc --project tsconfig.json",
+    "add-build": "git add dist",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "pre-commit": [
+    "ts.check",
+    "build",
+    "add-build"
+  ],
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -28,6 +36,7 @@
     "@types/luxon": "^3.2.0",
     "@types/node": "^18.11.18",
     "@types/node-telegram-bot-api": "^0.61.6",
+    "pre-commit": "^1.2.2",
     "prisma": "^4.8.1",
     "tsx": "^3.12.2",
     "typescript": "^4.9.4"
